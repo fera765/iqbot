@@ -1,13 +1,18 @@
 from __future__ import annotations
 import json
 import queue
+from pathlib import Path
 from flask import Flask, Response, render_template, request, jsonify, stream_with_context
 from app.config import Settings
 from app.bot import TradingBot, EventBus
 
 
 def create_app(settings: Settings, event_bus: EventBus, bot: TradingBot) -> Flask:
-    app = Flask(__name__, static_folder="web/static", template_folder="web/templates")
+    base_dir = Path(__file__).resolve().parent
+    static_dir = str(base_dir / "static")
+    templates_dir = str(base_dir / "templates")
+
+    app = Flask(__name__, static_folder=static_dir, template_folder=templates_dir)
 
     @app.get("/")
     def index():
@@ -35,7 +40,6 @@ def create_app(settings: Settings, event_bus: EventBus, bot: TradingBot) -> Flas
 
         def gen():
             try:
-                # Send an initial ping so the client knows it's connected
                 yield "data: {}\n\n"
                 while True:
                     evt = client_queue.get()

@@ -1,6 +1,8 @@
 flask==3.0.3
 numpy==1.26.4
-pandas==2.2.2
+# pandas disabled on Python 3.13 due to build; uncomment if using Python 3.12
+# pandas==2.2.2
 colorama==0.4.6
+websocket-client==0.56.0
 # Use GitHub version with stable_api
 iqoptionapi @ git+https://github.com/Lu-Yi-Hsun/iqoptionapi.git
