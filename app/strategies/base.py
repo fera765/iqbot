@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any, Protocol
+from typing import List, Optional, Protocol
 
 
 @dataclass
@@ -28,6 +28,13 @@ class Strategy(Protocol):
     def generate_signal(self, candles: List[dict]) -> Signal:
         ...
 
+
+class BaseStrategy:
+    name: str = "Base"
+
+    def generate_signal(self, candles: List[dict]) -> Signal:  # pragma: no cover
+        return Signal(None, "not_implemented")
+
     def backtest(
         self,
         candles: List[dict],
@@ -40,9 +47,7 @@ class Strategy(Protocol):
         losses = 0
         equals = 0
 
-        # We simulate by looking at the next candle direction
-        # A trade is taken only if confluence >= threshold
-        for i in range(20, len(candles) - 1):  # leave enough warmup for indicators
+        for i in range(20, len(candles) - 1):
             window = candles[: i + 1]
             signal = self.generate_signal(window)
             if signal.action is None:
@@ -52,12 +57,9 @@ class Strategy(Protocol):
             if score < confluence_threshold:
                 continue
             taken_trades += 1
-            this_candle = candles[i]
             next_candle = candles[i + 1]
-            this_close = this_candle["close"]
             next_close = next_candle["close"]
             next_open = next_candle["open"]
-            # Determine next candle direction
             if next_close > next_open:
                 next_dir = "call"
             elif next_close < next_open:

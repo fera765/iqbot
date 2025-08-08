@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import List, Tuple, Optional
-from iqoptionapi.stable_api import IQ_Option
 import time
 import threading
+
+from iqoptionapi.stable_api import IQ_Option  # type: ignore
 
 
 class IQClient:
@@ -15,23 +16,14 @@ class IQClient:
 
     def connect(self) -> None:
         with self._lock:
-            if self._api is None:
-                self._api = IQ_Option(self.email, self.password)
-            else:
-                try:
-                    self._api.disconnect()
-                except Exception:
-                    pass
-                self._api = IQ_Option(self.email, self.password)
-            self._api.connect()
-            self._api.change_balance(self.account_type)
+            self._api = IQ_Option(self.email, self.password)
+            if not self._api.connect():  # type: ignore
+                raise RuntimeError("Falha ao conectar no IQ Option API")
+            self._api.change_balance(self.account_type)  # type: ignore
 
     def ensure_connected(self) -> None:
-        if self._api is None:
+        if self._api is None or not self._api.check_connect():  # type: ignore
             self.connect()
-        else:
-            if not self._api.check_connect():  # type: ignore
-                self.connect()
 
     def get_server_time(self) -> int:
         self.ensure_connected()
@@ -42,7 +34,6 @@ class IQClient:
         if endtime is None:
             endtime = int(time.time())
         candles = self._api.get_candles(asset, timeframe_seconds, count, endtime)  # type: ignore
-        # Ensure candles are sorted by time
         candles_sorted = sorted(candles, key=lambda c: c["from"])  # type: ignore
         return candles_sorted
 

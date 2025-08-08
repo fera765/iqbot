@@ -18,7 +18,8 @@ class WebSocketManager:
 
     def start(self):
         if not self._started:
-            self.event_bus.subscribe(lambda e: asyncio.create_task(self.queue.put(e)))
+            loop = asyncio.get_event_loop()
+            self.event_bus.subscribe(lambda e: loop.call_soon_threadsafe(self.queue.put_nowait, e))
             self._started = True
 
     async def connect(self, websocket: WebSocket):
@@ -74,6 +75,10 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
         return templates.TemplateResponse("index.html", {"request": request})
+
+    @app.get("/events")
+    async def events(limit: int = 100):
+        return bot.event_bus.get_latest(limit)
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):

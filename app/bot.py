@@ -13,6 +13,8 @@ class EventBus:
     def __init__(self) -> None:
         self._subscribers: List = []
         self._lock = threading.Lock()
+        self._latest: List[Dict[str, Any]] = []
+        self._latest_max = 200
 
     def subscribe(self, handler) -> None:
         with self._lock:
@@ -25,11 +27,18 @@ class EventBus:
     def publish(self, event: Dict[str, Any]) -> None:
         with self._lock:
             subscribers = list(self._subscribers)
+            self._latest.append(event)
+            if len(self._latest) > self._latest_max:
+                self._latest = self._latest[-self._latest_max:]
         for h in subscribers:
             try:
                 h(event)
             except Exception:
                 pass
+
+    def get_latest(self, limit: int = 100) -> List[Dict[str, Any]]:
+        with self._lock:
+            return self._latest[-limit:]
 
 
 class TradingBot(threading.Thread):
@@ -59,7 +68,6 @@ class TradingBot(threading.Thread):
         time.sleep(sleep_time + 0.2)  # small buffer after close
 
     def _rebalance_strategy(self):
-        # Fetch candles and pick best strategy for each asset; choose the overall best
         best: Optional[Tuple[str, Strategy, BacktestMetrics]] = None
         for asset in self.settings.ASSETS:
             candles = self.client.get_candles(asset, self.settings.TIMEFRAME_SECONDS, self.settings.BACKTEST_CANDLES)
@@ -77,113 +85,113 @@ class TradingBot(threading.Thread):
             )
 
     def run(self):
-        self.client.ensure_connected()
-        self._publish("bot_status", status="connected", account_type=self.settings.IQ_ACCOUNT_TYPE)
-        self._rebalance_strategy()
-
-        last_rebalance = time.time()
+        backoff = 5
         while not self._stop.is_set():
-            # Rebalance strategy every ~30 minutes or if accuracy below threshold and a better one emerges
-            if time.time() - last_rebalance > 30 * 60 or self.current_strategy is None:
+            try:
+                self.client.ensure_connected()
+                self._publish("bot_status", status="connected", account_type=self.settings.IQ_ACCOUNT_TYPE)
                 try:
                     self._rebalance_strategy()
                 except Exception as e:
                     self._publish("error", message=f"rebalance_failed: {e}")
+
                 last_rebalance = time.time()
+                while not self._stop.is_set():
+                    if time.time() - last_rebalance > 30 * 60 or self.current_strategy is None:
+                        try:
+                            self._rebalance_strategy()
+                        except Exception as e:
+                            self._publish("error", message=f"rebalance_failed: {e}")
+                        last_rebalance = time.time()
 
-            if self.current_strategy is None or self.current_asset is None:
-                time.sleep(5)
-                continue
+                    if self.current_strategy is None or self.current_asset is None:
+                        time.sleep(5)
+                        continue
 
-            # Wait close of current candle
-            self._sync_to_candle_close(self.settings.TIMEFRAME_SECONDS)
+                    self._sync_to_candle_close(self.settings.TIMEFRAME_SECONDS)
+                    candles = self.client.get_candles(self.current_asset, self.settings.TIMEFRAME_SECONDS, 200)
+                    signal: Signal = self.current_strategy.generate_signal(candles)
+                    if signal.action is None:
+                        self._publish("no_trade", reason=signal.reason)
+                        continue
 
-            # Fetch fresh candles
-            candles = self.client.get_candles(self.current_asset, self.settings.TIMEFRAME_SECONDS, 200)
-            signal: Signal = self.current_strategy.generate_signal(candles)
-            if signal.action is None:
-                self._publish("no_trade", reason=signal.reason)
-                continue
+                    score = self.confluence.score(candles, signal.action)
+                    if score < self.settings.CONFLUENCE_THRESHOLD:
+                        self._publish("filtered", reason="low_confluence", confluence=score)
+                        continue
 
-            score = self.confluence.score(candles, signal.action)
-            if score < self.settings.CONFLUENCE_THRESHOLD:
-                self._publish("filtered", reason="low_confluence", confluence=score)
-                continue
+                    direction = signal.action
+                    stake = self.settings.STAKE
+                    duration_minutes = self.settings.TIMEFRAME_SECONDS // 60
+                    if duration_minutes <= 0:
+                        duration_minutes = 1
 
-            # Place trade
-            direction = signal.action
-            stake = self.settings.STAKE
-            duration_minutes = self.settings.TIMEFRAME_SECONDS // 60
-            if duration_minutes <= 0:
-                duration_minutes = 1
+                    ok, order_id = self.client.buy(stake, self.current_asset, direction, duration_minutes)
+                    if not ok or order_id is None:
+                        self._publish("order_rejected", stake=stake, direction=direction)
+                        continue
 
-            ok, order_id = self.client.buy(stake, self.current_asset, direction, duration_minutes)
-            if not ok or order_id is None:
-                self._publish("order_rejected", stake=stake, direction=direction)
-                continue
+                    self._publish(
+                        "order_placed",
+                        order_id=order_id,
+                        asset=self.current_asset,
+                        direction=direction,
+                        stake=stake,
+                        strategy=self.current_strategy.name,
+                        confluence=score,
+                    )
 
-            self._publish(
-                "order_placed",
-                order_id=order_id,
-                asset=self.current_asset,
-                direction=direction,
-                stake=stake,
-                strategy=self.current_strategy.name,
-                confluence=score,
-            )
+                    time.sleep(self.settings.TIMEFRAME_SECONDS + 1)
+                    status, profit = self.client.check_win_v4(order_id)
+                    if status == "win":
+                        self.pnl += profit
+                        self._publish("order_result", order_id=order_id, result="win", profit=profit, pnl=self.pnl)
+                        continue
+                    elif status == "equal":
+                        self._publish("order_result", order_id=order_id, result="equal", profit=0.0, pnl=self.pnl)
+                        continue
+                    else:
+                        self.pnl -= stake
+                        self._publish("order_result", order_id=order_id, result="loss", profit=-stake, pnl=self.pnl)
 
-            # Wait result
-            time.sleep(self.settings.TIMEFRAME_SECONDS + 1)
-            status, profit = self.client.check_win_v4(order_id)
-            if status == "win":
-                self.pnl += profit
-                self._publish("order_result", order_id=order_id, result="win", profit=profit, pnl=self.pnl)
-                continue
-            elif status == "equal":
-                self._publish("order_result", order_id=order_id, result="equal", profit=0.0, pnl=self.pnl)
-                continue
-            else:
-                self.pnl -= stake
-                self._publish("order_result", order_id=order_id, result="loss", profit=-stake, pnl=self.pnl)
+                    last_direction = direction
+                    for gale in range(1, self.settings.MAX_GALES + 1):
+                        new_stake = round(stake * (self.settings.MARTINGALE_MULTIPLIER ** gale), 2)
+                        self._sync_to_candle_close(self.settings.TIMEFRAME_SECONDS)
+                        candles = self.client.get_candles(self.current_asset, self.settings.TIMEFRAME_SECONDS, 200)
+                        ok2, order_id2 = self.client.buy(new_stake, self.current_asset, last_direction, duration_minutes)
+                        if not ok2 or order_id2 is None:
+                            self._publish("order_rejected", stake=new_stake, direction=last_direction, gale=gale)
+                            break
+                        self._publish("order_placed", order_id=order_id2, asset=self.current_asset, direction=last_direction, stake=new_stake, strategy=f"{self.current_strategy.name}-GALE{gale}")
+                        time.sleep(self.settings.TIMEFRAME_SECONDS + 1)
+                        status2, profit2 = self.client.check_win_v4(order_id2)
+                        if status2 == "win":
+                            self.pnl += profit2
+                            self._publish("order_result", order_id=order_id2, result="win", profit=profit2, pnl=self.pnl, gale=gale)
+                            break
+                        elif status2 == "equal":
+                            self._publish("order_result", order_id=order_id2, result="equal", profit=0.0, pnl=self.pnl, gale=gale)
+                            break
+                        else:
+                            self.pnl -= new_stake
+                            self._publish("order_result", order_id=order_id2, result="loss", profit=-new_stake, pnl=self.pnl, gale=gale)
 
-            # Martingale steps
-            last_result = status
-            last_direction = direction
-            for gale in range(1, self.settings.MAX_GALES + 1):
-                new_stake = round(stake * (self.settings.MARTINGALE_MULTIPLIER ** gale), 2)
-                # Enter immediately at next candle close
-                self._sync_to_candle_close(self.settings.TIMEFRAME_SECONDS)
-                candles = self.client.get_candles(self.current_asset, self.settings.TIMEFRAME_SECONDS, 200)
-                # Optional: Keep same direction for martingale
-                ok2, order_id2 = self.client.buy(new_stake, self.current_asset, last_direction, duration_minutes)
-                if not ok2 or order_id2 is None:
-                    self._publish("order_rejected", stake=new_stake, direction=last_direction, gale=gale)
-                    break
-                self._publish("order_placed", order_id=order_id2, asset=self.current_asset, direction=last_direction, stake=new_stake, strategy=f"{self.current_strategy.name}-GALE{gale}")
-                time.sleep(self.settings.TIMEFRAME_SECONDS + 1)
-                status2, profit2 = self.client.check_win_v4(order_id2)
-                if status2 == "win":
-                    self.pnl += profit2
-                    self._publish("order_result", order_id=order_id2, result="win", profit=profit2, pnl=self.pnl, gale=gale)
-                    break
-                elif status2 == "equal":
-                    self._publish("order_result", order_id=order_id2, result="equal", profit=0.0, pnl=self.pnl, gale=gale)
-                    break
-                else:
-                    self.pnl -= new_stake
-                    self._publish("order_result", order_id=order_id2, result="loss", profit=-new_stake, pnl=self.pnl, gale=gale)
-                    # Continue gales until max reached
+                    try:
+                        asset = self.current_asset
+                        candles = self.client.get_candles(asset, self.settings.TIMEFRAME_SECONDS, self.settings.BACKTEST_CANDLES)
+                        best_strat, best_metrics = self.backtester.pick_best(asset, self.settings.TIMEFRAME_SECONDS, candles)
+                        if best_metrics.accuracy >= self.settings.MIN_ACCURACY_TO_SELECT and (
+                            self.current_metrics is None or best_metrics.accuracy > self.current_metrics.accuracy
+                        ):
+                            self.current_strategy = best_strat
+                            self.current_metrics = best_metrics
+                            self._publish("strategy_switched", asset=asset, strategy=best_strat.name, accuracy=round(best_metrics.accuracy * 100, 2))
+                    except Exception as e:
+                        self._publish("error", message=f"post_trade_rebalance_error: {e}")
 
-            # Check periodically if a better strategy appears > threshold
-            try:
-                asset = self.current_asset
-                candles = self.client.get_candles(asset, self.settings.TIMEFRAME_SECONDS, self.settings.BACKTEST_CANDLES)
-                best_strat, best_metrics = self.backtester.pick_best(asset, self.settings.TIMEFRAME_SECONDS, candles)
-                if best_metrics.accuracy >= self.settings.MIN_ACCURACY_TO_SELECT and (
-                    self.current_metrics is None or best_metrics.accuracy > self.current_metrics.accuracy
-                ):
-                    self.current_strategy = best_strat
-                    self.current_metrics = best_metrics
-                    self._publish("strategy_switched", asset=asset, strategy=best_strat.name, accuracy=round(best_metrics.accuracy * 100, 2))
             except Exception as e:
-                self._publish("error", message=f"post_trade_rebalance_error: {e}")
+                self._publish("error", message=f"bot_loop_error: {e}")
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+                continue
