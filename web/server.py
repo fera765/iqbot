@@ -26,6 +26,10 @@ def create_app(settings: Settings, event_bus: EventBus, bot: TradingBot) -> Flas
             limit = 100
         return jsonify(event_bus.get_latest(limit))
 
+    @app.get("/catalog")
+    def catalog():
+        return jsonify(bot.latest_catalog)
+
     @app.get("/stream")
     def stream():
         client_queue: queue.Queue = queue.Queue(maxsize=1000)

@@ -8,6 +8,7 @@ from .config import Settings
 from .backtester import Backtester
 from .confluence import ConfluenceEngine
 from .strategies.base import Strategy, BacktestMetrics, Signal
+from .catalog import build_catalog
 
 colorama_init(autoreset=True)
 
@@ -28,7 +29,6 @@ class EventBus:
             self._subscribers = [h for h in self._subscribers if h != handler]
 
     def publish(self, event: Dict[str, Any]) -> None:
-        # Console colored log
         et = event.get("type", "event")
         if et in ("error",):
             print(Fore.RED + f"{et}: {event}")
@@ -36,6 +36,8 @@ class EventBus:
             print(Fore.CYAN + f"{et}: {event}")
         elif et in ("strategy_selected", "strategy_switched"):
             print(Fore.GREEN + f"{et}: {event}")
+        elif et in ("catalog", ):
+            print(Fore.MAGENTA + f"{et}: snapshot updated")
         else:
             print(Style.DIM + f"{et}: {event}")
 
@@ -68,6 +70,7 @@ class TradingBot(threading.Thread):
         self.current_metrics: Optional[BacktestMetrics] = None
         self.current_asset: Optional[str] = None
         self.pnl: float = 0.0
+        self.latest_catalog: Dict[str, List[dict]] = {}
 
     def stop(self):
         self._stop.set()
@@ -80,6 +83,13 @@ class TradingBot(threading.Thread):
         now = int(time.time())
         sleep_time = timeframe_seconds - (now % timeframe_seconds)
         time.sleep(sleep_time + 0.2)
+
+    def _build_catalog(self):
+        candles_by_asset: Dict[str, List[dict]] = {}
+        for asset in self.settings.ASSETS:
+            candles_by_asset[asset] = self.client.get_candles(asset, self.settings.TIMEFRAME_SECONDS, self.settings.BACKTEST_CANDLES)
+        self.latest_catalog = build_catalog(self.settings.ASSETS, self.settings.TIMEFRAME_SECONDS, candles_by_asset, self.backtester)
+        self._publish("catalog", data=self.latest_catalog)
 
     def _rebalance_strategy(self):
         best: Optional[Tuple[str, Strategy, BacktestMetrics]] = None
@@ -105,6 +115,10 @@ class TradingBot(threading.Thread):
                 self.client.ensure_connected()
                 self._publish("bot_status", status="connected", account_type=self.settings.IQ_ACCOUNT_TYPE)
                 try:
+                    self._build_catalog()
+                except Exception as e:
+                    self._publish("error", message=f"catalog_failed: {e}")
+                try:
                     self._rebalance_strategy()
                 except Exception as e:
                     self._publish("error", message=f"rebalance_failed: {e}")
@@ -112,6 +126,10 @@ class TradingBot(threading.Thread):
                 last_rebalance = time.time()
                 while not self._stop.is_set():
                     if time.time() - last_rebalance > 30 * 60 or self.current_strategy is None:
+                        try:
+                            self._build_catalog()
+                        except Exception as e:
+                            self._publish("error", message=f"catalog_failed: {e}")
                         try:
                             self._rebalance_strategy()
                         except Exception as e:
