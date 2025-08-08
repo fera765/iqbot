@@ -2,11 +2,14 @@ from __future__ import annotations
 import threading
 import time
 from typing import List, Optional, Dict, Any, Tuple
+from colorama import Fore, Style, init as colorama_init
 from .iq_client import IQClient
 from .config import Settings
 from .backtester import Backtester
 from .confluence import ConfluenceEngine
 from .strategies.base import Strategy, BacktestMetrics, Signal
+
+colorama_init(autoreset=True)
 
 
 class EventBus:
@@ -25,6 +28,17 @@ class EventBus:
             self._subscribers = [h for h in self._subscribers if h != handler]
 
     def publish(self, event: Dict[str, Any]) -> None:
+        # Console colored log
+        et = event.get("type", "event")
+        if et in ("error",):
+            print(Fore.RED + f"{et}: {event}")
+        elif et in ("order_result", "order_placed"):
+            print(Fore.CYAN + f"{et}: {event}")
+        elif et in ("strategy_selected", "strategy_switched"):
+            print(Fore.GREEN + f"{et}: {event}")
+        else:
+            print(Style.DIM + f"{et}: {event}")
+
         with self._lock:
             subscribers = list(self._subscribers)
             self._latest.append(event)
@@ -65,7 +79,7 @@ class TradingBot(threading.Thread):
     def _sync_to_candle_close(self, timeframe_seconds: int):
         now = int(time.time())
         sleep_time = timeframe_seconds - (now % timeframe_seconds)
-        time.sleep(sleep_time + 0.2)  # small buffer after close
+        time.sleep(sleep_time + 0.2)
 
     def _rebalance_strategy(self):
         best: Optional[Tuple[str, Strategy, BacktestMetrics]] = None

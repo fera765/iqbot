@@ -1,9 +1,6 @@
-fastapi==0.111.0
-uvicorn[standard]==0.30.0
+flask==3.0.3
 numpy==1.26.4
-python-dotenv==1.0.1
+pandas==2.2.2
+colorama==0.4.6
 # Use GitHub version with stable_api
 iqoptionapi @ git+https://github.com/Lu-Yi-Hsun/iqoptionapi.git
-websocket-client==1.8.0
-jinja2==3.1.4
-pydantic==2.8.2

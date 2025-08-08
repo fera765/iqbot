@@ -9,48 +9,45 @@ const eventsEl = document.getElementById('events');
 function addEvent(event) {
   const div = document.createElement('div');
   div.className = 'event';
-  div.textContent = `[${new Date(event.ts * 1000).toLocaleTimeString()}] ${event.type}: ${JSON.stringify(event)}`;
+  div.textContent = `[${new Date((event.ts || (Date.now()/1000)) * 1000).toLocaleTimeString()}] ${event.type}: ${JSON.stringify(event)}`;
   eventsEl.prepend(div);
 }
 
-function connectWs() {
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${protocol}://${window.location.host}/ws`;
-  const ws = new WebSocket(url);
+function connectSSE() {
+  const es = new EventSource('/stream');
 
-  ws.onopen = () => {
+  es.onopen = () => {
     statusEl.textContent = 'Conectado';
-    ws.send('hello');
   };
 
-  ws.onmessage = (msg) => {
-    const event = JSON.parse(msg.data);
-    addEvent(event);
+  es.onmessage = (msg) => {
+    if (!msg.data) return;
+    let data = {};
+    try { data = JSON.parse(msg.data); } catch (e) { return; }
+    if (!data.type) return;
+    addEvent(data);
 
-    if (event.type === 'bot_status' && event.status === 'connected') {
-      statusEl.textContent = 'Bot conectado (' + event.account_type + ')';
+    if (data.type === 'bot_status') {
+      statusEl.textContent = 'Bot: ' + (data.status || 'desconhecido');
     }
 
-    if (event.type === 'strategy_selected' || event.type === 'strategy_switched') {
-      if (event.asset) assetEl.textContent = event.asset;
-      if (event.strategy) strategyEl.textContent = event.strategy;
-      if (event.accuracy !== undefined) accuracyEl.textContent = event.accuracy;
-      if (event.taken_trades !== undefined) takenTradesEl.textContent = event.taken_trades;
+    if (data.type === 'strategy_selected' || data.type === 'strategy_switched') {
+      if (data.asset) assetEl.textContent = data.asset;
+      if (data.strategy) strategyEl.textContent = data.strategy;
+      if (data.accuracy !== undefined) accuracyEl.textContent = data.accuracy;
+      if (data.taken_trades !== undefined) takenTradesEl.textContent = data.taken_trades;
     }
 
-    if (event.type === 'order_result') {
-      if (event.pnl !== undefined) pnlEl.textContent = Number(event.pnl).toFixed(2);
+    if (data.type === 'order_result') {
+      if (data.pnl !== undefined) pnlEl.textContent = Number(data.pnl).toFixed(2);
     }
   };
 
-  ws.onclose = () => {
+  es.onerror = () => {
     statusEl.textContent = 'Reconectando...';
-    setTimeout(connectWs, 2000);
-  };
-
-  ws.onerror = () => {
-    statusEl.textContent = 'Erro no WebSocket';
+    es.close();
+    setTimeout(connectSSE, 2000);
   };
 }
 
-connectWs();
+connectSSE();
