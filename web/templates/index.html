@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IQOption MHI Bot (Demo)</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>IQOption MHI Bot (Demo)</h1>
+    <div id="status">Conectando...</div>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Estratégia Atual</h2>
+      <div><strong>Ativo:</strong> <span id="asset">-</span></div>
+      <div><strong>Estratégia:</strong> <span id="strategy">-</span></div>
+      <div><strong>Acurácia (backtest):</strong> <span id="accuracy">-</span>%</div>
+      <div><strong>Trades (backtest):</strong> <span id="taken_trades">-</span></div>
+    </div>
+
+    <div class="card">
+      <h2>PNL (Demo)</h2>
+      <div><strong>PNL:</strong> <span id="pnl">0.00</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Eventos</h2>
+    <div id="events" class="events"></div>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
