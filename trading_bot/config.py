@@ -1,7 +1,7 @@
 # Configurações do robô IQ Option MHI
 
-IQ_EMAIL = "seu_email_demo@exemplo.com"
-IQ_PASSWORD = "sua_senha_demo"
+IQ_EMAIL = "m.er.ed.i.th.gero.n.i.m.o.2.41@gmail.com"
+IQ_PASSWORD = "cacete8757"
 
 # Parâmetros de operação
 PAIR_LIST = ["EURUSD", "GBPUSD"]  # Pares padrão
