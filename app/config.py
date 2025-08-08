@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from dataclasses import dataclass, field
 from typing import List
 import os
 from dotenv import load_dotenv
@@ -6,55 +6,43 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-class Settings(BaseModel):
-    IQ_EMAIL: str = Field(..., description="IQ Option email")
-    IQ_PASSWORD: str = Field(..., description="IQ Option password")
-    IQ_ACCOUNT_TYPE: str = Field("PRACTICE", description="PRACTICE or REAL")
+@dataclass
+class Settings:
+    IQ_EMAIL: str
+    IQ_PASSWORD: str
+    IQ_ACCOUNT_TYPE: str = "PRACTICE"
 
-    ASSETS: List[str] = Field(default_factory=lambda: ["EURUSD"], description="Comma-separated list of assets")
-    STAKE: float = Field(2.0, description="Stake amount per entry")
-    TIMEFRAME_SECONDS: int = Field(60, description="Candle timeframe in seconds")
-    MAX_GALES: int = Field(2, description="Max martingale steps")
-    MARTINGALE_MULTIPLIER: float = Field(2.1, description="Multiplier for martingale stake")
+    ASSETS: List[str] = field(default_factory=lambda: ["EURUSD"])
+    STAKE: float = 2.0
+    TIMEFRAME_SECONDS: int = 60
+    MAX_GALES: int = 2
+    MARTINGALE_MULTIPLIER: float = 2.1
 
-    BACKTEST_CANDLES: int = Field(1500, description="Number of candles for backtesting")
-    MIN_ACCURACY_TO_SELECT: float = Field(0.9, description="Minimum accuracy threshold to select primary strategy")
+    BACKTEST_CANDLES: int = 1500
+    MIN_ACCURACY_TO_SELECT: float = 0.9
 
-    CONFLUENCE_THRESHOLD: int = Field(60, description="Confluence score threshold (0-100)")
+    CONFLUENCE_THRESHOLD: int = 60
 
-    HOST: str = Field("127.0.0.1", description="Web server host")
-    PORT: int = Field(8000, description="Web server port")
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    @field_validator("ASSETS", mode="before")
-    @classmethod
-    def parse_assets(cls, v):
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            return [asset.strip().upper() for asset in v.split(",") if asset.strip()]
-        return ["EURUSD"]
+    HOST: str = "127.0.0.1"
+    PORT: int = 8000
 
     @classmethod
     def from_env(cls) -> "Settings":
-        data = {k: os.getenv(k) for k in cls.model_fields.keys()}
-        # Convert types where needed
-        if data.get("STAKE") is not None:
-            data["STAKE"] = float(data["STAKE"])  # type: ignore
-        if data.get("TIMEFRAME_SECONDS") is not None:
-            data["TIMEFRAME_SECONDS"] = int(data["TIMEFRAME_SECONDS"])  # type: ignore
-        if data.get("MAX_GALES") is not None:
-            data["MAX_GALES"] = int(data["MAX_GALES"])  # type: ignore
-        if data.get("MARTINGALE_MULTIPLIER") is not None:
-            data["MARTINGALE_MULTIPLIER"] = float(data["MARTINGALE_MULTIPLIER"])  # type: ignore
-        if data.get("BACKTEST_CANDLES") is not None:
-            data["BACKTEST_CANDLES"] = int(data["BACKTEST_CANDLES"])  # type: ignore
-        if data.get("MIN_ACCURACY_TO_SELECT") is not None:
-            data["MIN_ACCURACY_TO_SELECT"] = float(data["MIN_ACCURACY_TO_SELECT"])  # type: ignore
-        if data.get("CONFLUENCE_THRESHOLD") is not None:
-            data["CONFLUENCE_THRESHOLD"] = int(data["CONFLUENCE_THRESHOLD"])  # type: ignore
-        if data.get("PORT") is not None:
-            data["PORT"] = int(data["PORT"])  # type: ignore
-        return cls(**data)  # type: ignore
+        env = os.getenv
+        assets_raw = env("ASSETS", "EURUSD")
+        assets = [a.strip().upper() for a in assets_raw.split(",") if a.strip()]
+        return cls(
+            IQ_EMAIL=env("IQ_EMAIL", ""),
+            IQ_PASSWORD=env("IQ_PASSWORD", ""),
+            IQ_ACCOUNT_TYPE=env("IQ_ACCOUNT_TYPE", "PRACTICE"),
+            ASSETS=assets,
+            STAKE=float(env("STAKE", "2")),
+            TIMEFRAME_SECONDS=int(env("TIMEFRAME_SECONDS", "60")),
+            MAX_GALES=int(env("MAX_GALES", "2")),
+            MARTINGALE_MULTIPLIER=float(env("MARTINGALE_MULTIPLIER", "2.1")),
+            BACKTEST_CANDLES=int(env("BACKTEST_CANDLES", "1500")),
+            MIN_ACCURACY_TO_SELECT=float(env("MIN_ACCURACY_TO_SELECT", "0.9")),
+            CONFLUENCE_THRESHOLD=int(env("CONFLUENCE_THRESHOLD", "60")),
+            HOST=env("HOST", "127.0.0.1"),
+            PORT=int(env("PORT", "8000")),
+        )
