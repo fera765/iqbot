@@ -1,0 +1,7 @@
+node_modules
+.next
+.env
+*.sqlite
+prisma/dev.db
+npm-debug.log*
+yarn-error.log

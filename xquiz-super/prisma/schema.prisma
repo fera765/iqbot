@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  nodes       Node[]
+  edges       Edge[]
+  published   Published?
+  leads       Lead[]
+}
+
+model Node {
+  id        String   @id
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  type      String
+  label     String
+  data      Json
+  positionX Float
+  positionY Float
+}
+
+model Edge {
+  id        String   @id
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  source    String
+  target    String
+  label     String?
+  data      Json?
+}
+
+model Published {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  projectId String   @unique
+  project   Project  @relation(fields: [projectId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  email     String
+  name      String?
+  answers   Json
+  outcome   String?
+  createdAt DateTime @default(now())
+}
