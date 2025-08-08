@@ -3,6 +3,7 @@ from trading_bot.trading.mhi import MHI
 from trading_bot.config import PAIR_LIST, ENTRY_VALUE, MARTINGALE, MHI_CYCLES, STOP_WIN, STOP_LOSS, MAX_TRADES
 from trading_bot.utils.logger import get_logger
 from trading_bot.utils.db import init_db
+import time
 
 logger = get_logger()
 
@@ -36,6 +37,11 @@ class TradingManager:
     def run_pair(self, pair):
         mhi = MHI(self.api, pair, self.entry_value, self.martingale, self.cycles)
         while self.running:
+            accuracy = mhi.mhi_accuracy_last_hour()
+            if accuracy < 90.0:
+                logger.info(f"Acurácia insuficiente para {pair} ({accuracy:.2f}%). Testando próximo ciclo...")
+                time.sleep(60)
+                continue
             mhi.run_cycle()
             self.stats[pair] = mhi.stats.copy()
             if mhi.stats["profit"] >= self.stop_win:

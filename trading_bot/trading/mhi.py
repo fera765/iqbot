@@ -98,3 +98,42 @@ class MHI:
             else:
                 logger.info(f"Fora do ciclo MHI, aguardando próximo...")
             time.sleep(60)  # Espera para próximo ciclo
+
+    def mhi_accuracy_last_hour(self):
+        # Busca 63 velas (21 ciclos de 3 velas) para 1 hora (M1)
+        candles = self.api.get_candles(self.pair, 60, 64, time.time())
+        # Remove a última vela (em formação)
+        candles = candles[:-1]
+        if len(candles) < 63:
+            logger.warning(f"Não foi possível obter velas suficientes para {self.pair}")
+            return 0.0
+        wins = 0
+        total = 0
+        # Para cada ciclo de 5 minutos (usa as 3 primeiras velas para prever a 4ª)
+        for i in range(0, 60, 3):
+            c1, c2, c3, c4 = candles[i], candles[i+1], candles[i+2], candles[i+3]
+            colors = []
+            for c in [c1, c2, c3]:
+                if c['close'] > c['open']:
+                    colors.append('g')
+                elif c['close'] < c['open']:
+                    colors.append('r')
+                else:
+                    colors.append('d')
+            if 'd' in colors:
+                continue  # pula ciclo com doji
+            if colors.count('g') > colors.count('r'):
+                direction = 'put'
+            elif colors.count('r') > colors.count('g'):
+                direction = 'call'
+            else:
+                continue
+            # Verifica se teria acertado
+            if direction == 'call' and c4['close'] > c4['open']:
+                wins += 1
+            elif direction == 'put' and c4['close'] < c4['open']:
+                wins += 1
+            total += 1
+        accuracy = (wins / total) * 100 if total > 0 else 0.0
+        logger.info(f"Acurácia MHI última hora para {self.pair}: {accuracy:.2f}% ({wins}/{total})")
+        return accuracy
