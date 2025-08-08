@@ -1,37 +1,72 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IQOption MHI Bot (Demo)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Catalogador IQOption</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <header>
-    <h1>IQOption MHI Bot (Demo)</h1>
-    <div id="status">Conectando...</div>
+    <h1>Catalogador IQOption</h1>
+    <div id="status">Desconectado</div>
   </header>
+
+  <section class="card">
+    <h2>Executar Catalogação</h2>
+    <div>
+      <label>Data (DD/MM/YYYY):</label>
+      <input id="dateInput" placeholder="opcional" />
+      <button id="runBtn">Executar</button>
+      <button id="refreshBtn">Atualizar Resultado</button>
+    </div>
+  </section>
 
   <section class="grid">
     <div class="card">
-      <h2>Estratégia Atual</h2>
-      <div><strong>Ativo:</strong> <span id="asset">-</span></div>
-      <div><strong>Estratégia:</strong> <span id="strategy">-</span></div>
-      <div><strong>Acurácia (backtest):</strong> <span id="accuracy">-</span>%</div>
-      <div><strong>Trades (backtest):</strong> <span id="taken_trades">-</span></div>
+      <h2>Eventos</h2>
+      <div id="events" class="events"></div>
     </div>
-
     <div class="card">
-      <h2>PNL (Demo)</h2>
-      <div><strong>PNL:</strong> <span id="pnl">0.00</span></div>
+      <h2>Resultado</h2>
+      <pre id="result" class="events"></pre>
     </div>
   </section>
 
-  <section class="card">
-    <h2>Eventos</h2>
-    <div id="events" class="events"></div>
-  </section>
+  <script>
+    const statusEl = document.getElementById('status');
+    const eventsEl = document.getElementById('events');
+    const resultEl = document.getElementById('result');
+    const runBtn = document.getElementById('runBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const dateInput = document.getElementById('dateInput');
 
-  <script src="/static/app.js"></script>
+    function addEvent(e) {
+      const div = document.createElement('div');
+      div.className = 'event';
+      div.textContent = JSON.stringify(e);
+      eventsEl.prepend(div);
+    }
+
+    function connectSSE() {
+      const es = new EventSource('/stream');
+      es.onopen = () => { statusEl.textContent = 'Conectado'; };
+      es.onmessage = (msg) => { if (msg.data) { try { addEvent(JSON.parse(msg.data)); } catch(e){} } };
+      es.onerror = () => { statusEl.textContent = 'Reconectando...'; es.close(); setTimeout(connectSSE, 2000); };
+    }
+
+    runBtn.onclick = async () => {
+      const date = dateInput.value.trim();
+      await fetch('/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date }) });
+    };
+
+    refreshBtn.onclick = async () => {
+      const res = await fetch('/results');
+      const json = await res.json();
+      resultEl.textContent = JSON.stringify(json, null, 2);
+    };
+
+    connectSSE();
+  </script>
 </body>
 </html>
