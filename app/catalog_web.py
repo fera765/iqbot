@@ -5,6 +5,7 @@ import threading
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, render_template, stream_with_context
 from colorama import Fore, Style, init as colorama_init
@@ -121,7 +122,6 @@ class CatalogService:
                 else:
                     self.bus.publish({"type": "asset_empty", "asset": asset})
 
-            # Placeholder: simple frequency backtest by time slot using majority color
             results: Dict[str, dict] = {}
             for asset, df in per_asset.items():
                 slot_stats = {}
@@ -157,7 +157,10 @@ class CatalogService:
 
 def create_app(email: str, password: str, assets: List[str], timeframe: int) -> Flask:
     service = CatalogService(email, password, assets, timeframe)
-    app = Flask(__name__, static_folder="web/static", template_folder="web/templates")
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    static_dir = str(web_dir / "static")
+    templates_dir = str(web_dir / "templates")
+    app = Flask(__name__, static_folder=static_dir, template_folder=templates_dir)
 
     @app.get("/")
     def index():
