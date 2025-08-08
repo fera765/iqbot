@@ -1,3 +1,9 @@
 2025-08-08 11:41:21,820 [INFO] Conectando à IQ Option...
 2025-08-08 11:41:23,086 [INFO] Conectado com sucesso!
+
+--- Estatísticas em tempo real ---
+EURUSD: {'wins': 0, 'losses': 0, 'trades': 0, 'profit': 0.0}
+GBPUSD: {'wins': 0, 'losses': 0, 'trades': 0, 'profit': 0.0}
+
+Comandos: [p]ausar, [s]air
 2025-08-08 11:41:23,106 [INFO] Robô iniciado para pares: ['EURUSD', 'GBPUSD']
