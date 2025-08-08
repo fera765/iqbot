@@ -5,7 +5,7 @@ Exemplos de uso do Robô IQ Option
 
 from config import Config
 from trading_bot import IQOptionBot
-from strategies import RSIStrategy, MACDStrategy, BollingerBandsStrategy
+from strategies import MHIStrategy, PivotStrategy, ConfluenceStrategy, MHIPivotStrategy, BinaryPatternStrategy, TimeBasedStrategy
 from risk_manager import RiskManager
 from logger import TradingLogger
 
@@ -17,7 +17,7 @@ def exemplo_configuracao_basica():
     config = Config()
     config.ASSET = 'EURUSD'
     config.AMOUNT = 1
-    config.STRATEGY = 'RSI'
+    config.STRATEGY = 'MHI'
     config.EXPIRATION = 1
     
     print(f"Ativo: {config.ASSET}")
@@ -31,17 +31,29 @@ def exemplo_estrategias():
     
     config = Config()
     
-    # Testa RSI
-    rsi_strategy = RSIStrategy(config)
-    print(f"RSI Strategy: {rsi_strategy.name}")
+    # Testa MHI
+    mhi_strategy = MHIStrategy(config)
+    print(f"MHI Strategy: {mhi_strategy.name}")
     
-    # Testa MACD
-    macd_strategy = MACDStrategy(config)
-    print(f"MACD Strategy: {macd_strategy.name}")
+    # Testa Pivot
+    pivot_strategy = PivotStrategy(config)
+    print(f"Pivot Strategy: {pivot_strategy.name}")
     
-    # Testa Bollinger
-    bollinger_strategy = BollingerBandsStrategy(config)
-    print(f"Bollinger Strategy: {bollinger_strategy.name}")
+    # Testa Confluência
+    confluence_strategy = ConfluenceStrategy(config)
+    print(f"Confluence Strategy: {confluence_strategy.name}")
+    
+    # Testa MHI + Pivot
+    mhi_pivot_strategy = MHIPivotStrategy(config)
+    print(f"MHI + Pivot Strategy: {mhi_pivot_strategy.name}")
+    
+    # Testa Padrões Binários
+    binary_strategy = BinaryPatternStrategy(config)
+    print(f"Binary Pattern Strategy: {binary_strategy.name}")
+    
+    # Testa Time-Based
+    time_strategy = TimeBasedStrategy(config)
+    print(f"Time-Based Strategy: {time_strategy.name}")
 
 def exemplo_gerenciamento_risco():
     """Exemplo de gerenciamento de risco"""
@@ -94,7 +106,7 @@ def exemplo_backtest():
     config = Config()
     config.ASSET = 'EURUSD'
     config.AMOUNT = 1
-    config.STRATEGY = 'RSI'
+    config.STRATEGY = 'MHI_PIVOT'
     
     bot = IQOptionBot(config)
     
@@ -107,20 +119,32 @@ def exemplo_configuracao_avancada():
     
     config = Config()
     
-    # Configuração conservadora
-    config.ASSET = 'GBPUSD'
-    config.AMOUNT = 0.5
-    config.STRATEGY = 'MACD'
-    config.EXPIRATION = 5
-    config.MAX_DAILY_LOSS = 10
-    config.MAX_DAILY_TRADES = 5
-    config.TRADING_HOURS = {'start': '08:00', 'end': '16:00'}
+    # Configuração para alta acertividade
+    config.ASSET = 'EURUSD'
+    config.AMOUNT = 1
+    config.STRATEGY = 'MHI_PIVOT'
+    config.EXPIRATION = 1
+    config.MHI_ENTRY_TIME = 5
+    config.MHI_ANALYSIS_PERIOD = 5
+    config.PIVOT_LOOKBACK = 20
+    config.PIVOT_STRENGTH = 3
+    config.CONFLUENCE_DAYS = 5
+    config.CONFLUENCE_MIN_STRENGTH = 3
+    config.MAX_DAILY_LOSS = 20
+    config.MAX_DAILY_TRADES = 10
+    config.TRADING_HOURS = {'start': '09:00', 'end': '17:00'}
     
-    print("Configuração Conservadora:")
+    print("Configuração para Alta Acertividade:")
     print(f"- Ativo: {config.ASSET}")
     print(f"- Valor: ${config.AMOUNT}")
     print(f"- Estratégia: {config.STRATEGY}")
     print(f"- Expiração: {config.EXPIRATION} min")
+    print(f"- Horário MHI: {config.MHI_ENTRY_TIME} min")
+    print(f"- Análise MHI: {config.MHI_ANALYSIS_PERIOD} dias")
+    print(f"- Lookback Pivot: {config.PIVOT_LOOKBACK} candles")
+    print(f"- Força Pivot: {config.PIVOT_STRENGTH}")
+    print(f"- Dias Confluência: {config.CONFLUENCE_DAYS}")
+    print(f"- Força Confluência: {config.CONFLUENCE_MIN_STRENGTH}")
     print(f"- Perda máxima: ${config.MAX_DAILY_LOSS}")
     print(f"- Máximo trades: {config.MAX_DAILY_TRADES}")
     print(f"- Horário: {config.TRADING_HOURS['start']} - {config.TRADING_HOURS['end']}")

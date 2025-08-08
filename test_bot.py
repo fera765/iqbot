@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 
 from config import Config
-from strategies import RSIStrategy, MACDStrategy, BollingerBandsStrategy, RandomStrategy
+from strategies import MHIStrategy, PivotStrategy, ConfluenceStrategy, MHIPivotStrategy, BinaryPatternStrategy, TimeBasedStrategy
 from risk_manager import RiskManager
 from logger import TradingLogger
 
@@ -18,80 +18,156 @@ class TestStrategies(unittest.TestCase):
     
     def setUp(self):
         self.config = Config()
-        self.config.STRATEGY = 'RSI'
-        self.config.RSI_PERIOD = 14
-        self.config.RSI_OVERBOUGHT = 70
-        self.config.RSI_OVERSOLD = 30
+        self.config.STRATEGY = 'MHI'
+        self.config.MHI_ENTRY_TIME = 5
+        self.config.MHI_ANALYSIS_PERIOD = 5
+        self.config.PIVOT_LOOKBACK = 20
+        self.config.PIVOT_STRENGTH = 3
+        self.config.CONFLUENCE_DAYS = 5
+        self.config.CONFLUENCE_MIN_STRENGTH = 3
     
-    def test_rsi_strategy(self):
-        """Testa a estratégia RSI"""
-        strategy = RSIStrategy(self.config)
+    def test_mhi_strategy(self):
+        """Testa a estratégia MHI"""
+        strategy = MHIStrategy(self.config)
         
-        # Cria dados de teste
+        # Cria dados de teste com padrão MHI
         candles = []
-        for i in range(20):
-            candles.append({
-                'timestamp': i,
-                'open': 1.1000 + i * 0.0001,
-                'high': 1.1005 + i * 0.0001,
-                'low': 1.0995 + i * 0.0001,
-                'close': 1.1002 + i * 0.0001,
-                'volume': 1000
-            })
+        base_time = 1609459200  # Timestamp base
         
-        # Testa cálculo de RSI
-        df = strategy.get_candles_dataframe(candles)
-        prices = df['close'].tolist()
-        rsi = strategy.calculate_rsi(prices, 14)
-        
-        self.assertIsInstance(rsi, float)
-        self.assertGreaterEqual(rsi, 0)
-        self.assertLessEqual(rsi, 100)
-    
-    def test_macd_strategy(self):
-        """Testa a estratégia MACD"""
-        strategy = MACDStrategy(self.config)
-        
-        # Cria dados de teste
-        candles = []
-        for i in range(50):
-            candles.append({
-                'timestamp': i,
-                'open': 1.1000 + i * 0.0001,
-                'high': 1.1005 + i * 0.0001,
-                'low': 1.0995 + i * 0.0001,
-                'close': 1.1002 + i * 0.0001,
-                'volume': 1000
-            })
+        for day in range(10):
+            for hour in range(9, 17):
+                for minute in [5, 15, 25, 35, 45, 55]:
+                    timestamp = base_time + (day * 86400) + (hour * 3600) + (minute * 60)
+                    
+                    # Simula padrão MHI: maioria verde no minuto 5
+                    if minute == 5:
+                        close = 1.1002 if day < 5 else 1.0998  # Maioria verde
+                    else:
+                        close = 1.1000 + (day * 0.0001)
+                    
+                    candles.append({
+                        'timestamp': timestamp,
+                        'open': 1.1000,
+                        'high': 1.1005,
+                        'low': 1.0995,
+                        'close': close,
+                        'volume': 1000
+                    })
         
         signal = strategy.calculate_signal(candles)
-        # MACD pode retornar None se não houver sinal claro
         self.assertIn(signal, ['call', 'put', None])
     
-    def test_bollinger_strategy(self):
-        """Testa a estratégia Bandas de Bollinger"""
-        strategy = BollingerBandsStrategy(self.config)
+    def test_pivot_strategy(self):
+        """Testa a estratégia Pivot"""
+        strategy = PivotStrategy(self.config)
         
-        # Cria dados de teste
+        # Cria dados de teste com pivots
         candles = []
         for i in range(30):
+            # Cria padrão de pivot
+            if i in [10, 20]:
+                high = 1.1020  # Pivot alto
+                low = 1.1000
+            elif i in [5, 15, 25]:
+                high = 1.1005
+                low = 1.0980  # Pivot baixo
+            else:
+                high = 1.1005
+                low = 1.1000
+            
             candles.append({
                 'timestamp': i,
-                'open': 1.1000 + i * 0.0001,
-                'high': 1.1005 + i * 0.0001,
-                'low': 1.0995 + i * 0.0001,
-                'close': 1.1002 + i * 0.0001,
+                'open': 1.1000,
+                'high': high,
+                'low': low,
+                'close': 1.1002,
                 'volume': 1000
             })
         
         signal = strategy.calculate_signal(candles)
         self.assertIn(signal, ['call', 'put', None])
     
-    def test_random_strategy(self):
-        """Testa a estratégia Random"""
-        strategy = RandomStrategy(self.config)
+    def test_confluence_strategy(self):
+        """Testa a estratégia de Confluência"""
+        strategy = ConfluenceStrategy(self.config)
+        
+        # Cria dados de teste para confluência
+        candles = []
+        base_time = 1609459200
+        
+        for day in range(10):
+            for hour in range(9, 17):
+                for minute in [5, 15, 25, 35, 45, 55]:
+                    timestamp = base_time + (day * 86400) + (hour * 3600) + (minute * 60)
+                    
+                    # Simula padrão de confluência no horário 10:05
+                    if hour == 10 and minute == 5:
+                        close = 1.1002 if day < 5 else 1.0998  # Maioria verde
+                    else:
+                        close = 1.1000 + (day * 0.0001)
+                    
+                    candles.append({
+                        'timestamp': timestamp,
+                        'open': 1.1000,
+                        'high': 1.1005,
+                        'low': 1.0995,
+                        'close': close,
+                        'volume': 1000
+                    })
+        
+        signal = strategy.calculate_signal(candles)
+        self.assertIn(signal, ['call', 'put', None])
+    
+    def test_mhi_pivot_strategy(self):
+        """Testa a estratégia combinada MHI + Pivot"""
+        strategy = MHIPivotStrategy(self.config)
         
         # Cria dados de teste
+        candles = []
+        for i in range(100):
+            candles.append({
+                'timestamp': i,
+                'open': 1.1000,
+                'high': 1.1005,
+                'low': 1.0995,
+                'close': 1.1002,
+                'volume': 1000
+            })
+        
+        signal = strategy.calculate_signal(candles)
+        self.assertIn(signal, ['call', 'put', None])
+    
+    def test_binary_pattern_strategy(self):
+        """Testa a estratégia de padrões binários"""
+        strategy = BinaryPatternStrategy(self.config)
+        
+        # Cria dados de teste com padrão específico
+        candles = []
+        pattern = [1.1002, 1.1002, 1.0998]  # green, green, red
+        
+        for i in range(10):
+            if i < 3:
+                close = pattern[i]
+            else:
+                close = 1.1000
+            
+            candles.append({
+                'timestamp': i,
+                'open': 1.1000,
+                'high': 1.1005,
+                'low': 1.0995,
+                'close': close,
+                'volume': 1000
+            })
+        
+        signal = strategy.calculate_signal(candles)
+        self.assertIn(signal, ['call', 'put', None])
+    
+    def test_time_based_strategy(self):
+        """Testa a estratégia baseada em horários"""
+        strategy = TimeBasedStrategy(self.config)
+        
+        # Cria dados de teste simples
         candles = [{'timestamp': 1, 'open': 1.1000, 'high': 1.1005, 'low': 1.0995, 'close': 1.1002, 'volume': 1000}]
         
         signal = strategy.calculate_signal(candles)

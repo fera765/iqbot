@@ -14,10 +14,17 @@ class Config:
     EXPIRATION = 1  # Tempo de expiração em minutos (1 ou 5)
     
     # Configurações de Estratégia
-    STRATEGY = 'RSI'  # Estratégia: RSI, MACD, BOLLINGER, RANDOM
-    RSI_PERIOD = 14
-    RSI_OVERBOUGHT = 70
-    RSI_OVERSOLD = 30
+    STRATEGY = 'MHI'  # Estratégia: MHI, PIVOT, CONFLUENCE, MHI_PIVOT
+    MHI_ENTRY_TIME = 5  # Minuto de entrada MHI (5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+    MHI_ANALYSIS_PERIOD = 5  # Dias para análise MHI
+    
+    # Configurações de Pivot
+    PIVOT_LOOKBACK = 20  # Candles para análise de pivot
+    PIVOT_STRENGTH = 3  # Força mínima do pivot (1-5)
+    
+    # Configurações de Confluência
+    CONFLUENCE_DAYS = 5  # Dias para análise de confluência
+    CONFLUENCE_MIN_STRENGTH = 3  # Força mínima da confluência
     
     # Configurações de Gerenciamento de Risco
     MAX_DAILY_LOSS = 50  # Perda máxima diária em dólares
