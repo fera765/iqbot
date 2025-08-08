@@ -1,0 +1,5 @@
+iqoptionapi
+flask
+numpy
+pandas
+click

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel Robô IQ Option MHI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Painel Robô IQ Option MHI</h1>
+    <h2>Status</h2>
+    <form action="/start" method="get"><button type="submit">Iniciar Robô</button></form>
+    <form action="/stop" method="get"><button type="submit">Parar Robô</button></form>
+    <h3>Configurações Atuais</h3>
+    <ul>
+        <li>Pares: {{ config.PAIR_LIST }}</li>
+        <li>Valor entrada: {{ config.ENTRY_VALUE }}</li>
+        <li>Martingale: {{ config.MARTINGALE }}</li>
+        <li>Ciclos MHI: {{ config.MHI_CYCLES }}</li>
+        <li>Stop win: {{ config.STOP_WIN }}</li>
+        <li>Stop loss: {{ config.STOP_LOSS }}</li>
+        <li>Limite trades: {{ config.MAX_TRADES }}</li>
+    </ul>
+    <form action="/config" method="post">
+        <button type="submit">Alterar Parâmetros (edite config.py)</button>
+    </form>
+    <h3>Estatísticas</h3>
+    <ul>
+    {% for pair, stat in stats.items() %}
+        <li>{{ pair }}: {{ stat }}</li>
+    {% endfor %}
+    </ul>
+    <h3>Histórico de Operações</h3>
+    <table border="1">
+        <tr><th>Data/Hora</th><th>Par</th><th>Direção</th><th>Resultado</th><th>Valor</th><th>Lucro</th></tr>
+        {% for t in trades %}
+        <tr>
+            <td>{{ t[1] }}</td><td>{{ t[2] }}</td><td>{{ t[3] }}</td><td>{{ t[4] }}</td><td>{{ t[5] }}</td><td>{{ t[6] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

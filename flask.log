@@ -1,0 +1,9 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "/workspace/run.py", line 8, in <module>
+    from trading_bot.web.app import app
+  File "/workspace/trading_bot/web/app.py", line 4, in <module>
+    from trading_bot.trading.iqapi import IQAPIClient
+  File "/workspace/trading_bot/trading/iqapi.py", line 1, in <module>
+    from iqoptionapi.stable_api import IQ_Option
+ModuleNotFoundError: No module named 'iqoptionapi.stable_api'
